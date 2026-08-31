@@ -67,6 +67,12 @@ _CN_EXP_LINE_RE = re.compile(
     r"^(?P<title>[^（(]{2,60}?)\s*[-—–－]\s*(?P<company>[^（(]{2,60}?)\s*"
     r"[（(](?P<start>\d{4})(?:\s*[-—–－至到]\s*(?P<end>\d{4}|至今|现在|今))?[）)]\s*$"
 )
+# Chinese experience line (alternate format): "公司｜职位 YYYY.MM–YYYY.MM"
+_CN_EXP_LINE_ALT_RE = re.compile(
+    r"^(?P<company>[^｜|]{2,60}?)\s*[｜|]\s*(?P<title>[^０-９0-9]{2,60}?)\s+"
+    r"(?P<start>\d{4})[.\/\-](?P<start_month>\d{1,2})\s*[–\-—]\s*"
+    r"(?P<end>\d{4}|至今|现在|今)(?:[.\/\-](?P<end_month>\d{1,2}))?\s*$"
+)
 _TRAILING_YEAR_RE = re.compile(r"\s*\((\d{4})\)\s*$")
 
 # Bullet prefixes used across resume/JD styles.
@@ -244,7 +250,7 @@ class MockLLMService(LLMService):
                 if open_entry is not None:
                     open_entry.highlights.append(_strip_bullet(line))
                 continue
-            if _is_education_line(line) or (in_education_section and not _EXP_LINE_RE.match(line) and not _CN_EXP_LINE_RE.match(line)):
+            if _is_education_line(line) or (in_education_section and not _EXP_LINE_RE.match(line) and not _CN_EXP_LINE_RE.match(line) and not _CN_EXP_LINE_ALT_RE.match(line)):
                 education.append(_parse_education(line))
                 open_entry = None
                 continue
@@ -253,6 +259,7 @@ class MockLLMService(LLMService):
             end_date_raw: str | None = None
             en_match = _EXP_LINE_RE.match(line)
             cn_match = _CN_EXP_LINE_RE.match(line)
+            cn_alt_match = _CN_EXP_LINE_ALT_RE.match(line)
             if en_match and "@" not in line:
                 entry = ExperienceItem(
                     title=en_match.group("title").strip(),
@@ -269,6 +276,14 @@ class MockLLMService(LLMService):
                     end_date=cn_match.group("end"),
                 )
                 end_date_raw = cn_match.group("end")
+            elif cn_alt_match and "@" not in line:
+                entry = ExperienceItem(
+                    title=cn_alt_match.group("title").strip(),
+                    company=cn_alt_match.group("company").strip(),
+                    start_date=cn_alt_match.group("start"),
+                    end_date=cn_alt_match.group("end"),
+                )
+                end_date_raw = cn_alt_match.group("end")
 
             if entry is not None:
                 if end_date_raw in ("至今", "现在", "今"):

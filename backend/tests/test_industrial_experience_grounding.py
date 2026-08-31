@@ -66,8 +66,8 @@ def test_industrial_resume_extracts_agv_robotics_experience():
     exp1 = profile.experience[0]
     assert exp1.title == "自动化工程师"
     assert exp1.company == "示例自动化科技有限公司"
-    assert exp1.start_date == "2022"
-    assert exp1.end_date == "2023"
+    assert exp1.start_date == "2022.07"
+    assert exp1.end_date == "2023.12"
     assert any("AGV" in h for h in exp1.highlights), "AGV should appear in highlights"
     
     # Check second experience (robotics focus)
@@ -229,3 +229,119 @@ def test_existing_tests_still_pass():
     
     # The original fixture has different format, so experience may or may not be extracted
     # depending on the format. This test just ensures no crash.
+
+
+def test_alternate_chinese_format_preserves_year_month_dates():
+    """Task 3C.3: Verify that alternate Chinese format (Company｜Title YYYY.MM–YYYY.MM)
+    preserves year.month dates and enables total_years_experience calculation.
+    """
+    profile = MockLLMService().extract_candidate_profile(_CN_INDUSTRIAL_RESUME)
+    
+    # Should extract 2 experience entries
+    assert len(profile.experience) == 2, (
+        f"Expected 2 experience entries, got {len(profile.experience)}"
+    )
+    
+    # First entry: 2022.07–2023.12
+    exp1 = profile.experience[0]
+    assert exp1.start_date == "2022.07", f"Expected start_date='2022.07', got '{exp1.start_date}'"
+    assert exp1.end_date == "2023.12", f"Expected end_date='2023.12', got '{exp1.end_date}'"
+    
+    # Second entry: 2022.01–2022.06
+    exp2 = profile.experience[1]
+    assert exp2.start_date == "2022.01", f"Expected start_date='2022.01', got '{exp2.start_date}'"
+    assert exp2.end_date == "2022.06", f"Expected end_date='2022.06', got '{exp2.end_date}'"
+    
+    # total_years_experience should be calculated (not None)
+    # 2022.01-2022.06 = 6 months, 2022.07-2023.12 = 18 months, total = 24 months = 2 years
+    assert profile.total_years_experience is not None, (
+        "total_years_experience should be calculated from dated entries"
+    )
+    assert profile.total_years_experience >= 2, (
+        f"Expected at least 2 years of experience, got {profile.total_years_experience}"
+    )
+
+
+def test_experience_duration_compared_against_jd_requirement():
+    """Task 3C.3: Verify that calculated experience duration is compared against
+    JD requirement rather than returning 'could not be determined'.
+    """
+    from app.services.matching import MatchingService
+    
+    profile = MockLLMService().extract_candidate_profile(_CN_INDUSTRIAL_RESUME)
+    requirements = MockLLMService().extract_job_requirements(_CN_AGV_JD)
+    
+    # Profile should have calculated experience
+    assert profile.total_years_experience is not None, (
+        "Profile should have calculated total_years_experience"
+    )
+    
+    # JD should require 2+ years
+    assert requirements.min_years_experience == 2, (
+        f"Expected JD to require 2 years, got {requirements.min_years_experience}"
+    )
+    
+    # MatchingService should compare actual years, not return "could not be determined"
+    match = MatchingService().calculate_match(profile, requirements)
+    
+    # Find experience_fit component
+    experience_component = next(
+        (c for c in match.score_breakdown if c.name == "experience_fit"),
+        None
+    )
+    assert experience_component is not None, "experience_fit component not found"
+    
+    # Detail should mention calculated years, not "could not be determined"
+    assert "could not be determined" not in experience_component.detail.lower(), (
+        f"Experience should be calculated, but detail says: {experience_component.detail}"
+    )
+    
+    # Score should be based on actual years
+    # 2022.01-2022.06 = 6 months, 2022.07-2023.12 = 18 months, total = 24 months = 2 years
+    # This meets the 2-year requirement, so score should be 100
+    assert experience_component.score == 100, (
+        f"Experience score should be 100 when candidate has 2 years and JD requires 2 years"
+    )
+    assert "2" in experience_component.detail, (
+        f"Detail should mention calculated years. Got: {experience_component.detail}"
+    )
+
+
+def test_job_domain_extraction_includes_title_and_skills():
+    """Task 3C.3: Verify that job domain extraction scans title, required_skills,
+    and preferred_skills in addition to responsibilities.
+    
+    Chinese JDs often put domain signals (AGV, robotics, etc.) in the title or
+    skills section rather than responsibilities. The domain normalizer should
+    extract these signals to produce non-empty job_families.
+    """
+    from app.services.domain_normalization import DomainNormalizer
+    
+    requirements = MockLLMService().extract_job_requirements(_CN_AGV_JD)
+    normalizer = DomainNormalizer()
+    
+    # Extract job families
+    job_families = normalizer.normalize_job(requirements)
+    
+    # Should extract domain families from title/skills/responsibilities
+    # The JD has "AGV机器人工程师" in title, "AGV、工业机器人、ROS2" in skills
+    # These should map to industrial_automation and robotics families
+    assert len(job_families) > 0, (
+        f"Job families should not be empty. "
+        f"Title='{requirements.title}', "
+        f"required_skills={requirements.required_skills}, "
+        f"preferred_skills={requirements.preferred_skills}"
+    )
+    
+    # Should include industrial_automation (from AGV, 自动化)
+    assert "industrial_automation" in job_families, (
+        f"Expected industrial_automation family from AGV/自动化 signals. "
+        f"Got families: {job_families}"
+    )
+    
+    # Should include robotics (from 机器人, robotics)
+    assert "robotics" in job_families, (
+        f"Expected robotics family from 机器人/robotics signals. "
+        f"Got families: {job_families}"
+    )
+

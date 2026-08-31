@@ -129,8 +129,14 @@ class DomainNormalizer:
         return self._families(" ".join(parts))
 
     def normalize_job(self, requirements: JobRequirements) -> frozenset[str]:
-        """Collect domain families required by the job responsibilities."""
-        return self._families(" ".join(requirements.responsibilities))
+        """Collect domain families required by the job."""
+        parts: list[str] = []
+        if requirements.title:
+            parts.append(requirements.title)
+        parts.extend(requirements.required_skills)
+        parts.extend(requirements.preferred_skills)
+        parts.extend(requirements.responsibilities)
+        return self._families(" ".join(parts))
 
     @staticmethod
     def _families(text: str) -> frozenset[str]:

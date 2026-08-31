@@ -17,6 +17,7 @@ from app.models.schemas import (
 )
 from app.services.llm.base import LLMService
 from app.services.skill_normalization import SkillNormalizer
+from app.services.experience_duration import ExperienceDurationService
 from app.services.text_normalization import build_term_pattern, contains_cjk
 
 # English-only fallback for contexts where the full normalizer isn't needed.
@@ -277,13 +278,26 @@ class MockLLMService(LLMService):
                 )
                 end_date_raw = cn_match.group("end")
             elif cn_alt_match and "@" not in line:
+                start_year = cn_alt_match.group("start")
+                start_month = cn_alt_match.group("start_month")
+                end_year = cn_alt_match.group("end")
+                end_month = cn_alt_match.group("end_month")
+                
+                start_date = f"{start_year}.{start_month}" if start_month else start_year
+                if end_year in ("至今", "现在", "今"):
+                    end_date = end_year
+                elif end_month:
+                    end_date = f"{end_year}.{end_month}"
+                else:
+                    end_date = end_year
+                
                 entry = ExperienceItem(
                     title=cn_alt_match.group("title").strip(),
                     company=cn_alt_match.group("company").strip(),
-                    start_date=cn_alt_match.group("start"),
-                    end_date=cn_alt_match.group("end"),
+                    start_date=start_date,
+                    end_date=end_date,
                 )
-                end_date_raw = cn_alt_match.group("end")
+                end_date_raw = end_year
 
             if entry is not None:
                 if end_date_raw in ("至今", "现在", "今"):
@@ -295,11 +309,22 @@ class MockLLMService(LLMService):
             in_education_section = False
 
         years_match = _YEARS_RE.search(resume_text) or _CN_YEARS_RE.search(resume_text)
-        total_years = (
-            int(years_match.group(1))
-            if years_match
-            else _parse_experience_years(experience)
-        )
+        if years_match:
+            total_years = int(years_match.group(1))
+        else:
+            total_years = _parse_experience_years(experience)
+            if total_years is None:
+                profile_skills = find_skills(resume_text)
+                temp_profile = CandidateProfile(
+                    name=name,
+                    email=email_match.group(0) if email_match else None,
+                    phone=phone_match.group(0).strip() if phone_match else None,
+                    skills=profile_skills,
+                    total_years_experience=None,
+                    experience=experience,
+                    education=education,
+                )
+                total_years = ExperienceDurationService().total_years(temp_profile)
 
         return CandidateProfile(
             name=name,

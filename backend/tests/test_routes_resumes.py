@@ -37,4 +37,6 @@ def test_upload_rejects_non_pdf_bytes(client):
 
 
 def test_health(client):
-    assert client.get("/api/health").json() == {"status": "ok"}
+    body = client.get("/api/health").json()
+    assert body["status"] == "ok"
+    assert "llm_provider" in body

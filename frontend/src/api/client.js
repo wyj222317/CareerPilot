@@ -37,3 +37,13 @@ export async function analyzeMatch(resumeText, jobDescription) {
   }
   return response.json()
 }
+
+export async function fetchHealth() {
+  try {
+    const response = await fetch(`${API_BASE}/health`)
+    if (!response.ok) return null
+    return response.json()
+  } catch {
+    return null
+  }
+}

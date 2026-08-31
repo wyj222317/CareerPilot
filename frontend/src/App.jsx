@@ -2,6 +2,7 @@ import { useState } from 'react'
 import ResumeUpload from './components/ResumeUpload.jsx'
 import JobDescriptionInput from './components/JobDescriptionInput.jsx'
 import MatchResults from './components/MatchResults.jsx'
+import DemoBanner from './components/DemoBanner.jsx'
 import { analyzeMatch, uploadResume } from './api/client.js'
 
 export default function App() {
@@ -48,6 +49,7 @@ export default function App() {
       </header>
 
       <main>
+        <DemoBanner />
         <section className="panel">
           <ResumeUpload resume={resume} error={uploadError} onFileSelected={handleFileSelected} />
           <JobDescriptionInput value={jobDescription} onChange={setJobDescription} />

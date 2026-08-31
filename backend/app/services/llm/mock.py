@@ -16,7 +16,10 @@ from app.models.schemas import (
     RewrittenBullet,
 )
 from app.services.llm.base import LLMService
+from app.services.skill_normalization import SkillNormalizer
+from app.services.text_normalization import build_term_pattern, contains_cjk
 
+# English-only fallback for contexts where the full normalizer isn't needed.
 WORD_SKILLS = {
     "python", "java", "javascript", "typescript", "react", "angular", "vue",
     "django", "flask", "fastapi", "pydantic", "spring", "sql", "mysql", "postgresql",
@@ -36,34 +39,78 @@ SYMBOL_SKILLS = {"c++", "c#", "node.js", "next.js", ".net", "ci/cd"}
 
 _EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 _PHONE_RE = re.compile(r"\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}")
+# English-style years mention: "5+ years", "3 years", etc.
 _YEARS_RE = re.compile(r"(\d+)\s*\+?\s*years", re.IGNORECASE)
-_PREFERRED_MARKERS = ("preferred", "nice to have", "bonus", "plus:")
+# Chinese-style years expressions: "3年以上", "5年经验", "至少3年".
+_CN_YEARS_RE = re.compile(r"(?:至少)?(\d+)\s*年(?:以上|经验|工作)?")
 
+# Section-header markers that split required vs preferred skills.
+_PREFERRED_MARKERS = (
+    "preferred", "nice to have", "bonus", "plus:",
+    "优先", "加分",
+)
+
+# Education line detection (English + Chinese).
 _DEGREE_KEYWORDS = (
     "b.s.", "b.a.", "m.s.", "m.a.", "ph.d.", "mba", "bachelor", "master",
+    "本科", "硕士", "博士", "学士", "学历", "学位",
 )
+_CN_DEGREE_SUFFIXES = ("本科", "硕士", "博士", "学士", "学历", "学位")
+
+# English experience line: "Title - Company (2018-2023)" or "(2018-Present)".
 _EXP_LINE_RE = re.compile(
-    r"^(?P<title>[^(]{2,60}?)\s+-\s+(?P<company>[^(]{2,60}?)\s+"
+    r"^(?P<title>[^(]{2,60}?)\s*-\s*(?P<company>[^(]{2,60}?)\s+"
     r"\((?P<start>\d{4})(?:\s*-\s*(?P<end>\d{4}|[Pp]resent))?\)\s*$"
 )
+# Chinese experience line: "职位 - 公司（2018-至今）" / "（2018-现在）".
+_CN_EXP_LINE_RE = re.compile(
+    r"^(?P<title>[^（(]{2,60}?)\s*[-—–－]\s*(?P<company>[^（(]{2,60}?)\s*"
+    r"[（(](?P<start>\d{4})(?:\s*[-—–－至到]\s*(?P<end>\d{4}|至今|现在|今))?[）)]\s*$"
+)
 _TRAILING_YEAR_RE = re.compile(r"\s*\((\d{4})\)\s*$")
-_BULLET_PREFIX = ("-", "•")
+
+# Bullet prefixes used across resume/JD styles.
+_BULLET_PREFIX = ("-", "•", "·", "▪", "‣")
+_CN_ENUMERATION_RE = re.compile(r"^(?:\d+|[一二三四五六七八九十]+)\s*[.、．]\s*")
+_CN_PAREN_ENUMERATION_RE = re.compile(r"^[（(]\s*(?:\d+|[一二三四五六七八九十]+)\s*[）)]\s*")
+
+# Chinese responsibility / requirement section headers.
+_CN_RESPONSIBILITY_HEADERS = (
+    "岗位职责", "工作内容", "工作职责", "职责描述", "主要职责",
+    "任职要求", "岗位要求", "职位要求", "任职资格",
+)
+_EDUCATION_SECTION_HEADERS = ("education", "学历", "教育背景", "教育经历")
 
 
 def find_skills(text: str) -> list[str]:
-    lowered = text.lower()
-    found = {skill for skill in WORD_SKILLS if re.search(rf"\b{skill}\b", lowered)}
-    found.update(skill for skill in SYMBOL_SKILLS if skill in lowered)
-    return sorted(found, key=str.lower)
+    """Return canonical skills mentioned in *text*, bilingual and CJK-aware.
+
+    Uses :class:`SkillNormalizer` for the full alias table (English + Chinese)
+    with correct boundary handling for both ASCII (``\\b``) and CJK terms.
+    """
+    if not text:
+        return []
+    return SkillNormalizer.extract_canonical_skills(text)
 
 
 def _is_education_line(line: str) -> bool:
     lowered = line.lower()
-    return any(keyword in lowered for keyword in _DEGREE_KEYWORDS)
+    if any(keyword in lowered for keyword in _DEGREE_KEYWORDS):
+        return True
+    return any(suffix in line for suffix in _CN_DEGREE_SUFFIXES)
 
 
 def _strip_bullet(line: str) -> str:
-    return line.lstrip("-• ").strip()
+    for prefix in _BULLET_PREFIX:
+        if line.startswith(prefix):
+            return line[len(prefix):].strip()
+    new_line, n_subs = _CN_ENUMERATION_RE.subn("", line, count=1)
+    if n_subs:
+        return new_line.strip()
+    new_line, n_subs = _CN_PAREN_ENUMERATION_RE.subn("", line, count=1)
+    if n_subs:
+        return new_line.strip()
+    return line.strip()
 
 
 def _parse_education(line: str) -> EducationItem:
@@ -72,10 +119,75 @@ def _parse_education(line: str) -> EducationItem:
     if year_match:
         year = year_match.group(1)
         line = line[: year_match.start()].rstrip()
-    degree, institution = line, None
+
+    # Helper: given two parts, identify which is the degree (the one containing
+    # a degree keyword) and which is the institution.
+    def _split_pair(left: str, right: str) -> EducationItem | None:
+        for keyword in _DEGREE_KEYWORDS:
+            if keyword in left.lower():
+                return EducationItem(degree=left.strip(), institution=right.strip() or None, year=year)
+            if keyword in right.lower():
+                return EducationItem(degree=right.strip(), institution=left.strip() or None, year=year)
+        return None
+
+    # Explicit "degree - institution" separator.
     if " - " in line:
-        degree, institution = (part.strip() for part in line.split(" - ", 1))
-    return EducationItem(degree=degree, institution=institution, year=year)
+        left, right = (part.strip() for part in line.split(" - ", 1))
+        return _split_pair(left, right) or EducationItem(degree=left, institution=right, year=year)
+
+    # Chinese resumes often use "|" / "｜" as the field separator:
+    #   "清华大学｜本科 2024" / "示例理工大学｜机械设计制造及其自动化｜工学学士 2018"
+    for sep in ("｜", "|"):
+        if sep in line:
+            parts = [part.strip() for part in line.split(sep)]
+            # Trailing year may sit on the last segment without parentheses:
+            # "工学学士 2018.09–2023.06". Strip a trailing 4-digit year group.
+            right_year_match = re.match(
+                r"^(.*?)[\s,，]+(\d{4}(?:\.\d{2})?(?:[–—\-~]\S*)?)\s*$", parts[-1]
+            )
+            if right_year_match and year is None:
+                year = right_year_match.group(2)
+                parts[-1] = right_year_match.group(1).strip()
+            # Pick the segment containing a degree keyword as the degree;
+            # join the rest as institution.
+            degree_idx = None
+            for idx, part in enumerate(parts):
+                if any(kw in part.lower() for kw in _DEGREE_KEYWORDS):
+                    degree_idx = idx
+                    break
+            if degree_idx is not None:
+                degree = parts[degree_idx]
+                institution = " ".join(p for i, p in enumerate(parts) if i != degree_idx)
+                return EducationItem(
+                    degree=degree, institution=institution or None, year=year
+                )
+            # No keyword matched — treat left as institution, last as degree.
+            return EducationItem(
+                degree=parts[-1], institution=" ".join(parts[:-1]) or None, year=year
+            )
+
+    # Chinese education often ends with the degree keyword:
+    #   "清华大学 本科" / "北京大学计算机硕士学位"
+    for suffix in _CN_DEGREE_SUFFIXES:
+        if line.endswith(suffix):
+            idx = len(line) - len(suffix)
+            institution = line[:idx].rstrip() or None
+            return EducationItem(degree=suffix, institution=institution, year=year)
+
+    # Plain English: "B.S. Computer Science" — whole line is the degree.
+    return EducationItem(degree=line, institution=None, year=year)
+
+
+def _is_responsibility_header(line: str) -> bool:
+    lowered = line.lower()
+    if lowered.startswith("responsibilit"):
+        return True
+    return any(header in line for header in _CN_RESPONSIBILITY_HEADERS)
+
+
+def _is_education_section_header(line: str) -> bool:
+    lowered = line.lower()
+    return any(header in lowered for header in _EDUCATION_SECTION_HEADERS)
 
 
 def _parse_experience_years(experience: list[ExperienceItem]) -> int | None:
@@ -83,11 +195,12 @@ def _parse_experience_years(experience: list[ExperienceItem]) -> int | None:
     for item in experience:
         if not (item.start_date and item.end_date and item.start_date.isdigit()):
             continue
-        end = (
-            int(item.end_date)
-            if item.end_date.isdigit()
-            else date.today().year
-        )
+        if item.end_date in ("Present", "present", "至今", "现在", "今"):
+            end = date.today().year
+        elif item.end_date.isdigit():
+            end = int(item.end_date)
+        else:
+            continue
         total += max(0, end - int(item.start_date))
     return total or None
 
@@ -96,7 +209,8 @@ class MockLLMService(LLMService):
     """Deterministic offline stand-in for a real LLM provider.
 
     Uses simple heuristics (skill lexicon, line-pattern regexes) so the full
-    pipeline runs and is testable without any API keys.
+    pipeline runs and is testable without any API keys. Bilingual: handles
+    both English and Chinese resumes / job descriptions.
     """
 
     def extract_candidate_profile(self, resume_text: str) -> CandidateProfile:
@@ -116,31 +230,56 @@ class MockLLMService(LLMService):
         experience: list[ExperienceItem] = []
         education: list[EducationItem] = []
         open_entry: ExperienceItem | None = None
+        in_education_section = False
         for line in lines:
             if not line:
                 open_entry = None
+                in_education_section = False
                 continue
-            if line.startswith(_BULLET_PREFIX):
+            if _is_education_section_header(line):
+                in_education_section = True
+                open_entry = None
+                continue
+            if line.startswith(_BULLET_PREFIX) or _CN_ENUMERATION_RE.match(line) or _CN_PAREN_ENUMERATION_RE.match(line):
                 if open_entry is not None:
                     open_entry.highlights.append(_strip_bullet(line))
                 continue
-            if _is_education_line(line):
+            if _is_education_line(line) or (in_education_section and not _EXP_LINE_RE.match(line) and not _CN_EXP_LINE_RE.match(line)):
                 education.append(_parse_education(line))
                 open_entry = None
                 continue
-            match = _EXP_LINE_RE.match(line)
-            if match and "@" not in line:
-                open_entry = ExperienceItem(
-                    title=match.group("title").strip(),
-                    company=match.group("company").strip(),
-                    start_date=match.group("start"),
-                    end_date=match.group("end"),
+
+            entry = None
+            end_date_raw: str | None = None
+            en_match = _EXP_LINE_RE.match(line)
+            cn_match = _CN_EXP_LINE_RE.match(line)
+            if en_match and "@" not in line:
+                entry = ExperienceItem(
+                    title=en_match.group("title").strip(),
+                    company=en_match.group("company").strip(),
+                    start_date=en_match.group("start"),
+                    end_date=en_match.group("end"),
                 )
-                experience.append(open_entry)
+                end_date_raw = en_match.group("end")
+            elif cn_match and "@" not in line:
+                entry = ExperienceItem(
+                    title=cn_match.group("title").strip(),
+                    company=cn_match.group("company").strip(),
+                    start_date=cn_match.group("start"),
+                    end_date=cn_match.group("end"),
+                )
+                end_date_raw = cn_match.group("end")
+
+            if entry is not None:
+                if end_date_raw in ("至今", "现在", "今"):
+                    entry.end_date = "Present"
+                experience.append(entry)
+                open_entry = entry
                 continue
             open_entry = None
+            in_education_section = False
 
-        years_match = _YEARS_RE.search(resume_text)
+        years_match = _YEARS_RE.search(resume_text) or _CN_YEARS_RE.search(resume_text)
         total_years = (
             int(years_match.group(1))
             if years_match
@@ -170,24 +309,44 @@ class MockLLMService(LLMService):
             preferred = [
                 skill for skill in find_skills(job_description[split_at:]) if skill not in required
             ]
-        years_match = _YEARS_RE.search(job_description)
+        years_match = _YEARS_RE.search(job_description) or _CN_YEARS_RE.search(job_description)
 
         responsibilities: list[str] = []
         education_requirements: list[str] = []
         in_responsibilities = False
+        in_education = False
         for line in job_description.splitlines():
             line = line.strip()
             if not line:
                 in_responsibilities = False
+                in_education = False
                 continue
-            if "responsibilit" in line.lower():
+            if _is_responsibility_header(line):
                 in_responsibilities = True
+                in_education = False
+                continue
+            if _is_education_section_header(line):
+                in_education = True
+                in_responsibilities = False
                 continue
             if in_responsibilities:
-                if line.startswith(_BULLET_PREFIX):
+                if (
+                    line.startswith(_BULLET_PREFIX)
+                    or _CN_ENUMERATION_RE.match(line)
+                    or _CN_PAREN_ENUMERATION_RE.match(line)
+                ):
                     responsibilities.append(_strip_bullet(line))
                     continue
                 in_responsibilities = False
+            if in_education:
+                if (
+                    line.startswith(_BULLET_PREFIX)
+                    or _CN_ENUMERATION_RE.match(line)
+                    or _CN_PAREN_ENUMERATION_RE.match(line)
+                ):
+                    education_requirements.append(_strip_bullet(line).rstrip("."))
+                    continue
+                in_education = False
             if _is_education_line(line):
                 education_requirements.append(_strip_bullet(line).rstrip("."))
 

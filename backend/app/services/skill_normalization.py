@@ -23,6 +23,8 @@ _SKILL_ALIASES: dict[str, str] = {
     # Core languages / runtimes
     "python": "python",
     "c": "c",
+    "c++": "c++",
+    "c#": "c#",
     "shell": "shell",
     "bash": "shell",
     "java": "java",
@@ -155,10 +157,12 @@ for _alias, _canonical in _SKILL_ALIASES.items():
 
 # Aliases may contain spaces, slashes, dots, plus signs, etc.  The lookbehind/ahead
 # ensures we do not match inside larger words (e.g. "js" inside "javascript").
+# `+` and `#` are included so that "c++" and "c#" aliases can match — without
+# them the regex stops after "c" because `+`/`#` fail the [a-z0-9] lookahead.
 _SKILL_RE = re.compile(
-    r"(?<![a-z0-9])("
+    r"(?<![a-z0-9+#])("
     + "|".join(re.escape(alias) for alias, _ in _SORTED_ALIASES)
-    + r")(?![a-z0-9])",
+    + r")(?![a-z0-9+#])",
     re.IGNORECASE,
 )
 

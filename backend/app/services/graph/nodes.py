@@ -22,7 +22,24 @@ def make_parse_resume_node(llm_service: LLMService):
             profile = llm_service.extract_candidate_profile(state["raw_resume_text"])
         except Exception as exc:
             return {"errors": [f"parse_resume: {exc}"]}
-        return {"candidate_profile": profile}
+        warnings: list[str] = []
+        raw_text = state.get("raw_resume_text") or ""
+        if (
+            len(raw_text) > 100
+            and not profile.skills
+            and not profile.experience
+            and not profile.education
+        ):
+            warnings.append(
+                "parse_resume: resume extraction returned no skills, experience, or "
+                "education from substantial input. With the heuristic mock provider, "
+                "this usually means the resume format is unsupported; connect a real "
+                "LLM provider for production-quality extraction."
+            )
+        result: dict = {"candidate_profile": profile}
+        if warnings:
+            result["errors"] = warnings
+        return result
 
     return parse_resume
 
@@ -33,7 +50,23 @@ def make_analyze_job_description_node(llm_service: LLMService):
             requirements = llm_service.extract_job_requirements(state["raw_job_description"])
         except Exception as exc:
             return {"errors": [f"analyze_job_description: {exc}"]}
-        return {"job_requirements": requirements}
+        warnings: list[str] = []
+        raw_text = state.get("raw_job_description") or ""
+        if (
+            len(raw_text) > 100
+            and not requirements.required_skills
+            and not requirements.responsibilities
+        ):
+            warnings.append(
+                "analyze_job_description: no required skills or responsibilities "
+                "extracted from substantial job description. With the heuristic mock "
+                "provider, this usually means the JD format is unsupported; connect a "
+                "real LLM provider for production-quality extraction."
+            )
+        result: dict = {"job_requirements": requirements}
+        if warnings:
+            result["errors"] = warnings
+        return result
 
     return analyze_job_description
 

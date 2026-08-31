@@ -1,0 +1,72 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 946 >>
+stream
+BT
+/F1 11 Tf
+72 720 Td
+(Jane Doe) Tj
+0 -18 Td
+(Senior Software Engineer) Tj
+0 -18 Td
+(jane.doe@example.com | \(555\) 123-4567 | San Francisco, CA) Tj
+0 -18 Td
+() Tj
+0 -18 Td
+(Skills) Tj
+0 -18 Td
+(Python, JavaScript, TypeScript, React, FastAPI, SQL, PostgreSQL, Docker, AWS, Git) Tj
+0 -18 Td
+() Tj
+0 -18 Td
+(Experience) Tj
+0 -18 Td
+(Senior Software Engineer - TechCorp \(2020-2023\)) Tj
+0 -18 Td
+(- Built and operated REST APIs with FastAPI and PostgreSQL serving 2M+ requests/day) Tj
+0 -18 Td
+(- Deployed containerized services with Docker on AWS) Tj
+0 -18 Td
+(- Mentored two junior engineers) Tj
+0 -18 Td
+() Tj
+0 -18 Td
+(Software Engineer - StartupXYZ \(2018-2020\)) Tj
+0 -18 Td
+(- Developed React frontend components used by 100k+ monthly active users) Tj
+0 -18 Td
+(- Wrote unit tests with pytest and integration tests with Playwright) Tj
+0 -18 Td
+() Tj
+0 -18 Td
+(Education) Tj
+0 -18 Td
+(B.S. Computer Science - State University \(2018\)) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000001238 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1308
+%%EOF

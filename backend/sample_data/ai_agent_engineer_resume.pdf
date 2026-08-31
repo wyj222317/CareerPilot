@@ -1,0 +1,84 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 1619 >>
+stream
+BT
+/F1 11 Tf
+72 720 Td
+(Alex Chen) Tj
+0 -18 Td
+(AI Engineer) Tj
+0 -18 Td
+(alex.chen@example.com | \(555\) 987-6543 | San Francisco, CA) Tj
+0 -18 Td
+() Tj
+0 -18 Td
+(Summary) Tj
+0 -18 Td
+(AI/ML engineer with 5+ years building production LLM-powered applications, agentic workflows, and scalable backend services. Experienced with LangGraph, LangChain, OpenAI/DeepSeek/Qwen APIs, FastAPI, and cloud deployment.) Tj
+0 -18 Td
+() Tj
+0 -18 Td
+(Skills) Tj
+0 -18 Td
+(Python, LangChain, LangGraph, OpenAI API, DeepSeek API, FastAPI, Pydantic, SQL, PostgreSQL, Docker, Kubernetes, AWS, React, TypeScript, Git, CI/CD) Tj
+0 -18 Td
+() Tj
+0 -18 Td
+(Experience) Tj
+0 -18 Td
+(Senior AI Engineer - AutoCorp \(2021-2025\)) Tj
+0 -18 Td
+(- Designed and deployed agentic workflows using LangGraph and LangChain for customer support automation) Tj
+0 -18 Td
+(- Integrated OpenAI, DeepSeek, and Qwen APIs via a unified provider abstraction with structured JSON output) Tj
+0 -18 Td
+(- Built REST APIs with FastAPI and Pydantic, serving 1M+ requests/day) Tj
+0 -18 Td
+(- Mentored junior engineers on LLM application design and prompt engineering) Tj
+0 -18 Td
+() Tj
+0 -18 Td
+(Software Engineer - DataMind \(2019-2021\)) Tj
+0 -18 Td
+(- Developed Python microservices for data pipelines and model serving) Tj
+0 -18 Td
+(- Deployed containerized services with Docker and Kubernetes on AWS) Tj
+0 -18 Td
+(- Collaborated with product teams to ship React/TypeScript frontend features) Tj
+0 -18 Td
+() Tj
+0 -18 Td
+(Education) Tj
+0 -18 Td
+(M.S. Computer Science - Tech University \(2019\)) Tj
+0 -18 Td
+(B.S. Computer Science - State University \(2017\)) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000001912 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1982
+%%EOF

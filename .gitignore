@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+# Environment files (any depth) — .env.example is committed as a template
+.env
+.env.*
+!.env.example
+backend/.env
+backend/.env.*
+!backend/.env.example
+
+# Node
+node_modules/
+frontend/dist/
+
+# macOS
+.DS_Store
+
+# PII - Real resume data (exclude at all known paths)
+scripts/prod_raw_text.txt
+scripts/prod_response.json
+backend/scripts/prod_raw_text.txt
+backend/scripts/prod_response.json

@@ -1,5 +1,7 @@
 # CareerPilot
 
+**[Live Demo](https://careerpilot-evm0.onrender.com)** · 线上演示运行于确定性 mock 模式，无需 API Key
+
 **Evidence-grounded AI job-fit analysis and resume optimization.**
 
 CareerPilot takes a resume and a job description, extracts structured profiles with an LLM, computes a deterministic weighted match score, retrieves verbatim resume evidence for every claim, and generates resume optimization suggestions that are validated against a nine-check factual boundary. Nothing in the output can invent facts the candidate didn't write.
@@ -15,7 +17,7 @@ CareerPilot takes a resume and a job description, extracts structured profiles w
 - **Evidence-constrained optimization** — rewrite, reorder, and surface suggestions that cite specific evidence IDs and pass nine post-generation validation checks
 - **Bilingual support** — Chinese and English resumes, skill aliases, section headers, education normalization, and factual concept validation
 - **Mock provider** — fully offline operation with no API key required; swap to DeepSeek, OpenAI, or Qwen with a single env var
-- **206 tests** including adversarial Chinese factuality cases, all passing with zero external dependencies
+- **225 tests** including adversarial Chinese factuality cases, all passing with zero external dependencies
 
 ---
 
@@ -123,7 +125,7 @@ CareerPilot handles Chinese and English resumes with the same pipeline. No langu
 ## Testing
 
 ```bash
-# Run all 206 tests (fully offline, no API key needed)
+# Run all 225 tests (fully offline, no API key needed)
 cd backend
 pytest tests/ -q
 
@@ -365,7 +367,7 @@ careerpilot/
 │   │       ├── llm/             # Provider base, mock, OpenAI-compatible
 │   │       └── optimization/    # Optimizer, policy, validator
 │   ├── scripts/                 # Evaluation and audit scripts
-│   ├── tests/                   # 206 pytest tests
+│   ├── tests/                   # 225 pytest tests
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   └── .env.example

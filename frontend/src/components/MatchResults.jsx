@@ -1,27 +1,43 @@
-function Chips({ skills }) {
+import MatchGauge from './charts/MatchGauge.jsx'
+import ScoreRadar from './charts/ScoreRadar.jsx'
+import ScoreContribution from './charts/ScoreContribution.jsx'
+import EvidenceBar from './charts/EvidenceBar.jsx'
+
+function Chips({ skills, variant = 'default' }) {
   if (!skills?.length) return <p className="muted">None detected</p>
   return (
     <div className="chips">
       {skills.map((skill) => (
-        <span key={skill} className="chip">{skill}</span>
+        <span key={skill} className={`chip chip--${variant}`}>
+          {skill}
+        </span>
       ))}
     </div>
   )
 }
 
-function scoreLabel(score) {
-  if (score >= 75) return 'Strong match'
-  if (score >= 50) return 'Partial match'
-  return 'Weak match'
+function StatCard({ value, label, hint, tone }) {
+  return (
+    <div className={`stat${tone ? ` stat--${tone}` : ''}`}>
+      <span className="stat__value">{value}</span>
+      <span className="stat__label">{label}</span>
+      {hint && <span className="stat__hint">{hint}</span>}
+    </div>
+  )
 }
 
 function OptimizationPanel({ optimization }) {
   if (!optimization) return null
-
   return (
-    <div className="optimization-panel">
-      <h4>Resume Optimization</h4>
-      <p className="muted">{optimization.summary}</p>
+    <section className="panel optimization-panel">
+      <header className="panel__head">
+        <h3 className="panel__title">Resume optimization</h3>
+        <p className="panel__hint">
+          Every suggestion below is constrained to resume evidence — nothing is invented.
+        </p>
+      </header>
+
+      {optimization.summary && <p className="optimization-summary">{optimization.summary}</p>}
 
       {optimization.actions?.length > 0 && (
         <ul className="optimization-list">
@@ -29,36 +45,43 @@ function OptimizationPanel({ optimization }) {
             <li key={idx} className="optimization-item">
               <div className="optimization-meta">
                 <span className="optimization-section">{action.target_section}</span>
-                <span className="muted">{action.action_type.replace(/_/g, ' ')}</span>
+                <span className="optimization-tag">{action.action_type.replace(/_/g, ' ')}</span>
               </div>
+
               {action.original_text && (
                 <div className="optimization-block">
                   <span className="optimization-label">Original</span>
-                  <p>{action.original_text}</p>
+                  <p className="optimization-original">{action.original_text}</p>
                 </div>
               )}
+
               {action.optimized_text && (
                 <div className="optimization-block">
                   <span className="optimization-label">Suggested</span>
-                  <p>{action.optimized_text}</p>
+                  <p className="optimization-suggested">{action.optimized_text}</p>
                 </div>
               )}
+
               <div className="optimization-block">
                 <span className="optimization-label">Why</span>
                 <p>{action.rationale}</p>
               </div>
+
               {action.target_requirements?.length > 0 && (
                 <div className="optimization-block">
                   <span className="optimization-label">Targets</span>
-                  <Chips skills={action.target_requirements} />
+                  <Chips skills={action.target_requirements} variant="target" />
                 </div>
               )}
+
               {action.evidence_ids?.length > 0 && (
                 <div className="optimization-block">
                   <span className="optimization-label">Evidence</span>
                   <div className="evidence-ids">
                     {action.evidence_ids.map((id) => (
-                      <span key={id} className="evidence-id">{id}</span>
+                      <span key={id} className="evidence-id">
+                        {id}
+                      </span>
                     ))}
                   </div>
                 </div>
@@ -70,7 +93,7 @@ function OptimizationPanel({ optimization }) {
 
       {optimization.gap_warnings?.length > 0 && (
         <div className="gap-warnings">
-          <h5>Gap Warnings</h5>
+          <h4>Gap warnings</h4>
           <ul>
             {optimization.gap_warnings.map((warning, idx) => (
               <li key={idx}>
@@ -84,7 +107,7 @@ function OptimizationPanel({ optimization }) {
 
       {optimization.validation_issues?.length > 0 && (
         <div className="validation-issues">
-          <h5>Validation Issues</h5>
+          <h4>Validation issues</h4>
           <ul>
             {optimization.validation_issues.map((issue, idx) => (
               <li key={idx}>
@@ -95,63 +118,141 @@ function OptimizationPanel({ optimization }) {
           </ul>
         </div>
       )}
-    </div>
+    </section>
   )
 }
 
 export default function MatchResults({ data }) {
   const { candidate, job_requirements: jobRequirements, match, optimization } = data
-  const tone = match.overall_score >= 75 ? 'high' : match.overall_score >= 50 ? 'mid' : 'low'
+  const components = match.score_breakdown ?? []
+  const evidence = match.evidence
+  const evidenceTotal = evidence
+    ? (evidence.supported_count ?? 0) +
+      (evidence.partially_supported_count ?? 0) +
+      (evidence.unsupported_count ?? 0)
+    : 0
+  const coverage = evidenceTotal
+    ? Math.round(((evidence.supported_count ?? 0) / evidenceTotal) * 100)
+    : null
 
   return (
-    <section className="panel results">
-      <h2>Match Results</h2>
-      <div className="score-row">
-        <div className={`score-badge ${tone}`}>{match.overall_score}</div>
-        <div className="score-info">
-          <h3>{scoreLabel(match.overall_score)}</h3>
-          <p>{match.summary}</p>
-        </div>
-      </div>
-      <div className="score-bar">
-        <div className={`score-fill ${tone}`} style={{ width: `${match.overall_score}%` }} />
-      </div>
+    <div className="results">
+      <section className="panel score-hero">
+        <MatchGauge score={match.overall_score} summary={match.summary} />
 
-      {match.score_breakdown?.length > 0 && (
-        <div className="breakdown">
-          <h4>Score breakdown</h4>
-          <ul className="breakdown-list">
-            {match.score_breakdown.map((component) => (
-              <li key={component.name} className="breakdown-item">
-                <div className="breakdown-head">
-                  <span>{component.name.replace(/_/g, ' ')}</span>
-                  <span className="muted">
-                    {Math.round(component.weight * 100)}% weight · {component.score}/100
-                  </span>
-                </div>
-                <div className="score-bar small">
-                  <div
-                    className={`score-fill ${tone}`}
-                    style={{ width: `${component.score}%` }}
-                  />
-                </div>
-                <span className="muted">{component.detail}</span>
-              </li>
-            ))}
-          </ul>
+        <div className="score-hero__side">
+          <div className="stats">
+            <StatCard
+              value={match.matched_skills.length}
+              label="Matched skills"
+              tone="good"
+            />
+            <StatCard
+              value={match.missing_skills.length}
+              label="Skill gaps"
+              tone={match.missing_skills.length ? 'warn' : 'good'}
+            />
+            <StatCard
+              value={jobRequirements.required_skills.length}
+              label="Required by job"
+            />
+            <StatCard
+              value={coverage === null ? '—' : `${coverage}%`}
+              label="Evidence-backed"
+              hint={evidenceTotal ? `${evidenceTotal} claims checked` : 'no claims retrieved'}
+              tone={coverage !== null && coverage >= 70 ? 'good' : 'warn'}
+            />
+          </div>
+        </div>
+      </section>
+
+      {components.length > 0 && (
+        <div className="chart-grid">
+          <section className="panel">
+            <header className="panel__head">
+              <h3 className="panel__title">Score radar</h3>
+              <p className="panel__hint">Five rubric dimensions, each scored 0–100.</p>
+            </header>
+            <ScoreRadar components={components} />
+          </section>
+
+          <section className="panel">
+            <header className="panel__head">
+              <h3 className="panel__title">Weighted contribution</h3>
+              <p className="panel__hint">Bar width = weight. Fill = how much of it you earned.</p>
+            </header>
+            <ScoreContribution components={components} />
+          </section>
         </div>
       )}
 
-      {match.evidence && match.evidence.claims?.length > 0 && (
-        <div className="evidence-panel">
-          <h4>
-            Evidence
-            <span className="muted">
-              {' '}· {match.evidence.supported_count} supported · {match.evidence.partially_supported_count} partial · {match.evidence.unsupported_count} unsupported
-            </span>
-          </h4>
+      <section className="panel">
+        <header className="panel__head">
+          <h3 className="panel__title">Skill coverage</h3>
+          <p className="panel__hint">What you already have vs. what the posting still asks for.</p>
+        </header>
+
+        <div className="coverage">
+          <div className="coverage__col">
+            <h4 className="coverage__title coverage__title--good">
+              Matched skills <span>{match.matched_skills.length}</span>
+            </h4>
+            <Chips skills={match.matched_skills} variant="matched" />
+          </div>
+
+          <div className="coverage__col">
+            <h4 className="coverage__title coverage__title--warn">
+              Skill gaps <span>{match.missing_skills.length}</span>
+            </h4>
+            {match.missing_skills.length ? (
+              <ul className="gap-list">
+                {match.missing_skills.map((gap) => (
+                  <li key={gap.skill}>
+                    <strong>{gap.skill}</strong>
+                    <span>{gap.suggestion}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="muted">No gaps detected — you cover all listed requirements.</p>
+            )}
+          </div>
+
+          <div className="coverage__col">
+            <h4 className="coverage__title">
+              Required by the job <span>{jobRequirements.required_skills.length}</span>
+            </h4>
+            <Chips skills={jobRequirements.required_skills} variant="required" />
+            {jobRequirements.preferred_skills?.length > 0 && (
+              <>
+                <h4 className="coverage__title coverage__title--sub">Preferred</h4>
+                <Chips skills={jobRequirements.preferred_skills} variant="preferred" />
+              </>
+            )}
+          </div>
+
+          <div className="coverage__col">
+            <h4 className="coverage__title">
+              Detected in your resume <span>{candidate.skills?.length ?? 0}</span>
+            </h4>
+            <Chips skills={candidate.skills} variant="resume" />
+          </div>
+        </div>
+      </section>
+
+      {evidence?.claims?.length > 0 && (
+        <section className="panel evidence-panel">
+          <header className="panel__head">
+            <h3 className="panel__title">Evidence validation</h3>
+            <p className="panel__hint">
+              Every claim is traced back to verbatim resume text before it is shown.
+            </p>
+          </header>
+
+          <EvidenceBar evidence={evidence} />
+
           <ul className="evidence-list">
-            {match.evidence.claims.map((claim, idx) => (
+            {evidence.claims.map((claim, idx) => (
               <li key={idx} className={`evidence-item ${claim.support_level}`}>
                 <div className="evidence-head">
                   <span className="evidence-claim">{claim.claim}</span>
@@ -172,57 +273,40 @@ export default function MatchResults({ data }) {
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {(match.strengths?.length > 0 || match.recommendations?.length > 0) && (
+        <div className="chart-grid">
+          {match.strengths?.length > 0 && (
+            <section className="panel">
+              <header className="panel__head">
+                <h3 className="panel__title">Strengths</h3>
+              </header>
+              <ul className="bullet-list bullet-list--good">
+                {match.strengths.map((strength) => (
+                  <li key={strength}>{strength}</li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {match.recommendations?.length > 0 && (
+            <section className="panel">
+              <header className="panel__head">
+                <h3 className="panel__title">Recommendations</h3>
+              </header>
+              <ol className="bullet-list bullet-list--action">
+                {match.recommendations.map((recommendation) => (
+                  <li key={recommendation}>{recommendation}</li>
+                ))}
+              </ol>
+            </section>
+          )}
         </div>
       )}
 
       <OptimizationPanel optimization={optimization} />
-
-      <div className="result-grid">
-        <div>
-          <h4>Matched skills</h4>
-          <Chips skills={match.matched_skills} />
-          <h4>Skills detected in your resume</h4>
-          <Chips skills={candidate.skills} />
-        </div>
-        <div>
-          <h4>Skill gaps</h4>
-          {match.missing_skills.length ? (
-            <ul className="gap-list">
-              {match.missing_skills.map((gap) => (
-                <li key={gap.skill}>
-                  <strong>{gap.skill}</strong>
-                  <span>{gap.suggestion}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="muted">No gaps detected — you cover all listed requirements.</p>
-          )}
-          <h4>Required by the job</h4>
-          <Chips skills={jobRequirements.required_skills} />
-        </div>
-      </div>
-
-      {match.strengths.length > 0 && (
-        <div>
-          <h4>Strengths</h4>
-          <ul>
-            {match.strengths.map((strength) => (
-              <li key={strength}>{strength}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {match.recommendations.length > 0 && (
-        <div>
-          <h4>Recommendations</h4>
-          <ol>
-            {match.recommendations.map((recommendation) => (
-              <li key={recommendation}>{recommendation}</li>
-            ))}
-          </ol>
-        </div>
-      )}
-    </section>
+    </div>
   )
 }

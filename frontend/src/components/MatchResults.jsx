@@ -139,7 +139,9 @@ export default function MatchResults({ data }) {
   return (
     <div className="results">
       <section className="panel score-hero">
-        <MatchGauge score={match.overall_score} summary={match.summary} />
+        <ErrorBoundary>
+          <MatchGauge score={match.overall_score} summary={match.summary} />
+        </ErrorBoundary>
 
         <div className="score-hero__side">
           <div className="stats">
@@ -174,7 +176,9 @@ export default function MatchResults({ data }) {
               <h3 className="panel__title">Score radar</h3>
               <p className="panel__hint">Five rubric dimensions, each scored 0–100.</p>
             </header>
-            <ScoreRadar components={components} />
+            <ErrorBoundary>
+              <ScoreRadar components={components} />
+            </ErrorBoundary>
           </section>
 
           <section className="panel">
@@ -182,7 +186,9 @@ export default function MatchResults({ data }) {
               <h3 className="panel__title">Weighted contribution</h3>
               <p className="panel__hint">Bar width = weight. Fill = how much of it you earned.</p>
             </header>
-            <ScoreContribution components={components} />
+            <ErrorBoundary>
+              <ScoreContribution components={components} />
+            </ErrorBoundary>
           </section>
         </div>
       )}
@@ -250,7 +256,9 @@ export default function MatchResults({ data }) {
             </p>
           </header>
 
-          <EvidenceBar evidence={evidence} />
+          <ErrorBoundary>
+            <EvidenceBar evidence={evidence} />
+          </ErrorBoundary>
 
           <ul className="evidence-list">
             {evidence.claims.map((claim, idx) => (

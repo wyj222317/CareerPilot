@@ -1,6 +1,7 @@
 # CareerPilot
 
-**[Live Demo](https://careerpilot-evm0.onrender.com)** · 线上演示运行于确定性 mock 模式，无需 API Key
+**[Live Demo](https://careerpilot-evm0.onrender.com)** · + 线上演示运行于 DeepSeek 实时解析模式；本地开发可切换为离线 mock，无需 API Key
+
 
 **Evidence-grounded AI job-fit analysis and resume optimization.**
 

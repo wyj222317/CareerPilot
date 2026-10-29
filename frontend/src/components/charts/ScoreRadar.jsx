@@ -50,7 +50,7 @@ export default function ScoreRadar({ components = [] }) {
   return (
     <div className="radar">
       <svg
-        viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
+        viewBox={`0 0 ${VIEW_W = SIZE} ${VIEW_H = SIZE}`}
         className="radar__svg"
         role="img"
         aria-label="Radar chart of the weighted score breakdown"

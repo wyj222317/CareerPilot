@@ -2,6 +2,7 @@ import MatchGauge from './charts/MatchGauge.jsx'
 import ScoreRadar from './charts/ScoreRadar.jsx'
 import ScoreContribution from './charts/ScoreContribution.jsx'
 import EvidenceBar from './charts/EvidenceBar.jsx'
+import ErrorBoundary from './ErrorBoundary.jsx'
 
 function Chips({ skills, variant = 'default' }) {
   if (!skills?.length) return <p className="muted">None detected</p>
